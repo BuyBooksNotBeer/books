@@ -96,18 +96,18 @@ public class MarketDataAccessController
                         String qouteType = optionChainResponse.getQuoteType();
                         
                         List<OptionPairEntry> optionPairs = optionChainResponse.getOptionPairs();
-                        for (OptionPairEntry optionPair : optionPairs)
+                        OptionLeg option =  getCloestOption(optionPairs,optionType, strike);
+                        if (option != null) 
                         {
-                            OptionLeg leg = "Call".equalsIgnoreCase(optionType) ? optionPair.getCall() : optionPair.getPut();
-                            double bid = leg.getBid();
-                            double ask = leg.getAsk();
-                            double last = leg.getLastPrice();
+                            double bid = option.getBid();
+                            double ask = option.getAsk();
+                            double last = option.getLastPrice();
                             // writer.println("expiration,symbol,strike,optiontype,bid,ask,last,quotetype");
                             writer.println(String.format("%s,%s,%s,%s,"
                                     + "%f,%f,%f,%s", 
                                     expiration, symbol, strike, optionType, 
                                     bid, ask, last, qouteType));
-                            writer.flush();
+                            writer.flush();    
                         }
                     }
                     logger.info("optionchains response {}", optionChainWrapper);
@@ -123,6 +123,45 @@ public class MarketDataAccessController
         {
             logger.warn("Unable to handle option chain request",e);
         }
+    }
+    
+    protected OptionLeg getCloestOption(List<OptionPairEntry> optionPairs, String optionType, String targetStrike) 
+    {  
+        double target = Double.parseDouble(targetStrike);
+        OptionLeg bestLeg = null;
+        for (OptionPairEntry optionPair : optionPairs)
+        {
+            OptionLeg leg; 
+            if ("CALL".equalsIgnoreCase(optionType))
+            {
+                leg = optionPair.getCall();
+            }
+            else
+            {
+                leg = optionPair.getPut();
+                
+            }
+            double legStrike = leg.getStrikePrice();
+            if (Double.compare(legStrike, target) == 0)
+            {
+                return leg;
+            }
+            if (bestLeg == null)
+            {
+                bestLeg = leg;
+            }
+            else
+            {
+                if ( Math.abs(target - leg.getStrikePrice()) < Math.abs(target - bestLeg.getStrikePrice()) )
+                {
+                    bestLeg = leg;
+                }
+            }
+        }
+        logger.warn("Could not find an exact match for the strike {}, using option leg{}", targetStrike, bestLeg);
+        return bestLeg;
+        
+        
     }
     
     @GetMapping("/qoute")
