@@ -30,6 +30,7 @@ public class OAuthAccessTokenManager
     
     public void saveAccessToken(OAuth1AccessToken accessToken)
     {
+        this.accessToken = accessToken;
         File tokenCache = new File(savePath, TOKEN_FILE_NAME);
         try(
             FileOutputStream fos = new FileOutputStream(tokenCache);
