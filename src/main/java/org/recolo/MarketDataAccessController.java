@@ -12,6 +12,8 @@ import org.recolo.model.option.OptionLeg;
 import org.recolo.model.option.OptionPairEntry;
 import org.recolo.model.optionexpiration.ExpirationDate;
 import org.recolo.model.optionexpiration.OptionExpireDateResponseWrapper;
+import org.recolo.model.quote.AllQuoteDetails;
+import org.recolo.model.quote.QuoteResponseWrapper;
 import org.recolo.oauth.OAuth1Interceptor;
 import org.recolo.oauth.OAuthController;
 import org.slf4j.Logger;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.github.scribejava.core.model.OAuth1AccessToken;
@@ -159,24 +162,72 @@ public class MarketDataAccessController
                 }
             }
         }
-        logger.warn("Could not find an exact match for the strike {}, using option leg{}", targetStrike, bestLeg);
+        logger.warn("Could not find an exact match for the strike {}, using option leg {}", targetStrike, bestLeg);
         return bestLeg;
         
         
     }
     
-    @GetMapping("/qoute")
-    public String getQuote(@RequestParam(name = "symbol", defaultValue = "qqq") String symbol)
+    @GetMapping("/quote")
+    public void getQuote(HttpServletResponse response, @RequestParam(name = "symbol", defaultValue = "qqq") String symbol)
     {
         logger.info("Quote request: {}  ", symbol);
-        RestTemplate restTemplate = serviceRestTemplate();
-        if (restTemplate ==null)
-            return "oAuth Token not ready";
+        try (PrintWriter writer = response.getWriter())
+        {
+            RestTemplate restTemplate = serviceRestTemplate();
+            if (restTemplate == null)
+            {
+                writer.println(String.format("Marketdata API not ready to look up quote for %s", symbol));
+                return;
+            }
 
-        String url = getUrl("quote/"+symbol);
-        String response = restTemplate.getForObject(url, String.class, EMPTY_HASHMAP);
-        logger.info("Quote request: {}, response {}", symbol, response);
-        return response;
+            QuoteResponseWrapper qouteResponse = null;
+            try
+            {
+                String url = getUrl("quote/" + symbol);
+                qouteResponse = restTemplate.getForObject(url, QuoteResponseWrapper.class, EMPTY_HASHMAP);
+                
+            }
+            catch (HttpClientErrorException e)
+            {
+                writer.println(String.format("HttpClientErrorException oAuth Token not ready to look up quote %s", symbol));
+                logger.warn("Exception while retrieving quote from ETrade API for symbol for {}", symbol, e);
+                return;
+            }
+
+            response.setContentType("text/csv");
+
+            if (qouteResponse == null || qouteResponse.getQuoteResponse() == null || qouteResponse.getQuoteResponse().getQuoteData() == null || qouteResponse.getQuoteResponse().getQuoteData().size() == 0 || qouteResponse.getQuoteResponse().getQuoteData().get(0).getAll() == null)
+            {
+                
+                writer.println(String.format("No quote found for %s", symbol));
+                
+            }
+            else
+            {
+                writer.println("symbol,last,bid,ask,open,previousclose,volume,previousvolume,status");
+                AllQuoteDetails allDetails = qouteResponse.getQuoteResponse().getQuoteData().get(0).getAll();
+                String quoteSymbol =  qouteResponse.getQuoteResponse().getQuoteData().get(0).getProduct().getSymbol();
+                
+                
+                String qouteDetails = String.format("%s,%f,%f,%f"+
+                        "%f,%f,%d,%d,"+ 
+                        "%s",
+                        quoteSymbol, allDetails.getLastTrade(), allDetails.getBid(), allDetails.getAsk(),
+                        allDetails.getOpen(),  allDetails.getPreviousClose(), allDetails.getTotalVolume(), allDetails.getPreviousDayVolume(),
+                        qouteResponse.getQuoteResponse().getQuoteData().get(0).getQuoteStatus()
+                        ) ;
+                writer.println(qouteDetails);
+                
+                logger.info("Quote Details received: {}", qouteDetails);
+            }
+            writer.flush();
+        }
+        catch (IOException e)
+        {
+            logger.warn("Exception while retrieving quote from ETrade API for symbol {}", symbol, e);
+        }
+
     }
     
     public RestTemplate serviceRestTemplate() {

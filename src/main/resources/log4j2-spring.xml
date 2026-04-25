@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Configuration status="WARN">
-    <Appenders>
-        <Console name="CONSOLE" target="SYSTEM_OUT">
-            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n"/>
-        </Console>
-    </Appenders>
-    <Loggers>
-        <Root level="INFO">
-            <AppenderRef ref="CONSOLE"/>
-        </Root>
-    </Loggers>
+	<Appenders>
+		<Console name="CONSOLE" target="SYSTEM_OUT">
+			<PatternLayout
+				pattern="%d{yyyy-MM-dd HH:mm:ss} %-5p %c{1}:%L - %m%n" />
+		</Console>
+		<RollingFile name="RollingFile" fileName="application.log" filePattern="ETradeMarketDataService-%d{yyyy-MM-dd}.log">
+			<PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss} [%t] %-5level %logger{36} - %msg%n" />
+
+			<!-- Roll when date changes (at first write after midnight) -->
+			<TimeBasedTriggeringPolicy interval="1" modulate="true" />
+
+			<DefaultRolloverStrategy max="30" />
+		</RollingFile>
+	</Appenders>
+	<Loggers>
+		<Root level="INFO">
+			<AppenderRef ref="CONSOLE" />
+			<AppenderRef ref="RollingFile" />
+		</Root>
+	</Loggers>
 </Configuration>
