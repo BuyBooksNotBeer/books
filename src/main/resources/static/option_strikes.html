@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Option Chain Price Chart</title>
+    <!-- Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; background: #f5f7fa; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; color: #333; }
+        form { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #eee; }
+        .form-group { display: flex; flex-direction: column; flex: 1; min-width: 140px; }
+        label { font-size: 0.85rem; font-weight: 600; color: #555; margin-bottom: 4px; }
+        input, select { padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+        button { padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px; font-size: 1rem; cursor: pointer; align-self: flex-end; }
+        button:hover { background: #1d4ed8; }
+        button:disabled { background: #94a3b8; cursor: not-allowed; }
+        .status { min-height: 20px; margin-bottom: 12px; font-size: 0.9rem; }
+        .error { color: #dc2626; }
+        .loading { color: #2563eb; }
+        canvas { background: #fff; }
+        
+        /* New styles for the Quote display */
+        .quote-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            display: none; /* Hidden by default */
+        }
+        .quote-info h3 {
+            margin: 0 0 12px 0;
+            color: #334155;
+            font-size: 1.1rem;
+        }
+        .quote-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 12px;
+            font-size: 0.95rem;
+            color: #475569;
+        }
+        .quote-grid div strong {
+            color: #1e293b;
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Option Price by Expiration</h1>
+        <form id="optionForm">
+            <div class="form-group">
+                <label for="symbol">Ticker Symbol</label>
+                <input type="text" id="symbol" value="QQQ" placeholder="e.g. QQQ, SPY" required>
+            </div>
+            <div class="form-group">
+                <label for="strike">Strike Price</label>
+                <input type="number" id="strike" step="0.01" value="635" placeholder="e.g. 635.00" required>
+            </div>
+            <div class="form-group">
+                <label for="optionType">Option Type</label>
+                <select id="optionType">
+                    <option value="call">Call</option>
+                    <option value="put" selected>Put</option>
+                </select>
+            </div>
+            <button type="submit" id="submitBtn">Generate Chart</button>
+        </form>
+        <div id="status" class="status"></div>
+        <canvas id="priceChart"></canvas>
+        
+        <!-- New container for displaying the quote -->
+        <div id="quoteInfo" class="quote-info">
+            <h3>📊 Current Quote</h3>
+            <div id="quoteDetails" class="quote-grid"></div>
+        </div>
+    </div>
+
+    <script>
+        // 🔧 Change this if your Spring Boot app runs on a different port/domain
+        let chartInstance = null;
+
+        document.getElementById('optionForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const statusEl = document.getElementById('status');
+            
+            const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+            const strike = document.getElementById('strike').value;
+            const optionType = document.getElementById('optionType').value.toUpperCase();
+
+            btn.disabled = true;
+            statusEl.className = 'status loading';
+            statusEl.textContent = 'Fetching data from E*Trade API...';
+
+            try {
+                const url = `/optionsByStrike?symbol=${encodeURIComponent(symbol)}&strike=${encodeURIComponent(strike)}&optionType=${encodeURIComponent(optionType)}`;
+                const response = await fetch(url);
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+
+                const csvText = await response.text();
+                const { dates, bids, asks, lasts } = parseCSV(csvText);
+
+                if (dates.length === 0) throw new Error('No data returned for the given parameters.');
+
+                renderChart(dates, bids, asks, lasts);
+                statusEl.textContent = `✅ Loaded ${dates.length} expiration dates.`;
+                statusEl.className = 'status';
+                
+                // Fetch and display the current quote for the symbol after the chart renders
+                fetchAndDisplayQuote(symbol);
+
+            } catch (err) {
+                statusEl.textContent = `❌ Error: ${err.message}`;
+                statusEl.className = 'status error';
+                console.error(err);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // New function to fetch and display the current quote
+        async function fetchAndDisplayQuote(symbol) {
+            const quoteInfoEl = document.getElementById('quoteInfo');
+            const quoteDetailsEl = document.getElementById('quoteDetails');
+            
+            quoteInfoEl.style.display = 'block';
+            quoteDetailsEl.innerHTML = '<div style="color: #2563eb;">Loading quote...</div>';
+            
+            try {
+                // Using the exact URL format provided
+                const response = await fetch(`http://localhost:8080/quote?symbol=${symbol.toLowerCase()}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const csvText = await response.text();
+                const lines = csvText.trim().split('\n');
+                if (lines.length < 2) throw new Error('Invalid quote data');
+                
+                // Parse CSV headers and values
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const values = lines[1].split(',').map(v => v.trim());
+                
+                const quote = {};
+                headers.forEach((h, i) => {
+                    quote[h] = values[i];
+                });
+                
+                // Render the quote details in a clean grid
+                quoteDetailsEl.innerHTML = `
+                    <div><strong>Symbol</strong>${quote.symbol}</div>
+                    <div><strong>Last</strong>$${parseFloat(quote.last).toFixed(2)}</div>
+                    <div><strong>Bid</strong>$${parseFloat(quote.bid).toFixed(2)}</div>
+                    <div><strong>Ask</strong>$${parseFloat(quote.ask).toFixed(2)}</div>
+                    <div><strong>Open</strong>$${parseFloat(quote.open).toFixed(2)}</div>
+                    <div><strong>Prev Close</strong>$${parseFloat(quote.previousclose).toFixed(2)}</div>
+                    <div><strong>Volume</strong>${parseInt(quote.volume).toLocaleString()}</div>
+                    <div><strong>Status</strong>${quote.status}</div>
+                `;
+            } catch (err) {
+                quoteDetailsEl.innerHTML = `<div style="color: #dc2626; grid-column: 1 / -1;">❌ Error fetching quote: ${err.message}</div>`;
+                console.error('Error fetching quote:', err);
+            }
+        }
+
+        function parseCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const dates = [], bids = [], asks = [], lasts = [];
+            
+            // Skip header row (index 0)
+            for (let i = 1; i < lines.length; i++) {
+                const cols = lines[i].split(',').map(c => c.trim());
+                if (cols.length < 7) continue;
+
+                dates.push(cols[0]); // expiration
+                bids.push(parseFloat(cols[4])); // bid
+                asks.push(parseFloat(cols[5])); // ask
+                lasts.push(parseFloat(cols[6])); // last
+            }
+            return { dates, bids, asks, lasts };
+        }
+
+        function renderChart(labels, bidData, askData, lastData) {
+            const ctx = document.getElementById('priceChart').getContext('2d');
+            
+            // Destroy previous chart if it exists
+            if (chartInstance) chartInstance.destroy();
+
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Bid', data: bidData, borderColor: '#16a34a', backgroundColor: 'rgba(22, 163, 74, 0.1)', tension: 0, fill: false, pointRadius: 3 },
+                        { label: 'Ask', data: askData, borderColor: '#dc2626', backgroundColor: 'rgba(220, 38, 38, 0.1)', tension: 0, fill: false, pointRadius: 3 },
+                        { label: 'Last', data: lastData, borderColor: '#2563eb', backgroundColor: 'rgba(37, 99, 235, 0.1)', tension: 0.1, fill: false, pointRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    interaction: { mode: 'index', intersect: false },
+                    scales: {
+                        x: { 
+                            title: { display: true, text: 'Expiration Date', font: { weight: 'bold' } },
+                            ticks: { maxRotation: 45, minRotation: 0 }
+                        },
+                        y: { 
+                            title: { display: true, text: 'Price ($)', font: { weight: 'bold' } },
+                            beginAtZero: false,
+                            grid: { color: '#e5e7eb' }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleFont: { size: 13 },
+                            bodyFont: { size: 12 },
+                            callbacks: {
+                                label: (context) => `${context.dataset.label}: $${context.parsed.y.toFixed(2)}`
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
