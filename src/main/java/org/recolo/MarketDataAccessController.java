@@ -210,7 +210,7 @@ public class MarketDataAccessController
                 String quoteSymbol =  qouteResponse.getQuoteResponse().getQuoteData().get(0).getProduct().getSymbol();
                 
                 
-                String qouteDetails = String.format("%s,%f,%f,%f"+
+                String qouteDetails = String.format("%s,%f,%f,%f,"+
                         "%f,%f,%d,%d,"+ 
                         "%s",
                         quoteSymbol, allDetails.getLastTrade(), allDetails.getBid(), allDetails.getAsk(),
