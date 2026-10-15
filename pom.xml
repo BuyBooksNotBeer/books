@@ -80,19 +80,100 @@
 			<artifactId>jackson-databind</artifactId>
 			<version>2.21.2</version>
 		</dependency>
-
-		<!-- Testing: Updated to JUnit 5 -->
+		
+	    <!-- Hadoop Common (Required for Path and Configuration) -->
+	    <dependency>
+	        <groupId>org.apache.hadoop</groupId>
+	        <artifactId>hadoop-common</artifactId>
+	        <version>3.4.0</version>
+	        <exclusions>
+		        <exclusion>
+		            <groupId>org.slf4j</groupId>
+		            <artifactId>slf4j-reload4j</artifactId>
+		        </exclusion>
+		        <exclusion>
+		            <groupId>ch.qos.logback</groupId>
+		            <artifactId>logback-classic</artifactId>
+		        </exclusion>
+		        <exclusion>
+		            <groupId>ch.qos.logback</groupId>
+		            <artifactId>logback-core</artifactId>
+		        </exclusion>
+		        <exclusion>
+		            <groupId>org.apache.logging.log4j</groupId>
+		            <artifactId>log4j-slf4j2-impl</artifactId>
+       			 </exclusion>
+	        </exclusions>
+	    </dependency>
+	    
+	    <dependency>
+	        <groupId>org.apache.hadoop</groupId>
+	        <artifactId>hadoop-mapreduce-client-core</artifactId>
+	        <version>3.4.0</version>
+	        <exclusions>
+				<exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-reload4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+	        </exclusions>
+	    </dependency>	
+		
+		<!-- Source: https://mvnrepository.com/artifact/org.apache.parquet/parquet-hadoop -->
 		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter</artifactId>
-			<version>5.10.1</version>
-			<scope>test</scope>
+		    <groupId>org.apache.parquet</groupId>
+		    <artifactId>parquet-hadoop</artifactId>
+		    <version>1.17.1</version>
+	        <exclusions>
+				<exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-reload4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+	        </exclusions>
 		</dependency>
+	
+	    <dependency>
+	        <groupId>org.apache.parquet</groupId>
+	        <artifactId>parquet-common</artifactId>
+	        <version>1.17.1</version>
+	        <exclusions>
+				<exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-reload4j</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>ch.qos.logback</groupId>
+                    <artifactId>logback-classic</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.apache.logging.log4j</groupId>
+                    <artifactId>log4j-slf4j2-impl</artifactId>
+                </exclusion>
+	        </exclusions>
+	    </dependency>
+
+				
+		<!-- Source: https://mvnrepository.com/artifact/org.junit.jupiter/junit-jupiter -->
 		<dependency>
-			<groupId>org.junit.jupiter</groupId>
-			<artifactId>junit-jupiter-engine</artifactId>
-			<version>5.10.1</version>
-			<scope>test</scope>
+		    <groupId>org.junit.jupiter</groupId>
+		    <artifactId>junit-jupiter</artifactId>
+		    <version>6.0.0</version>
+		    <scope>test</scope>
 		</dependency>
 
 		<!-- Template Engine: Updated Velocity -->

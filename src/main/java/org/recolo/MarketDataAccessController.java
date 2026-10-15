@@ -64,6 +64,7 @@ public class MarketDataAccessController
             {
                 logger.info("oAuth Token not ready");
                 writer.println("oAuth Token not ready");      
+                return;
             }
             String url = getUrl("optionexpiredate?symbol={symbol}&expiryType={expiryType}");
             
@@ -228,6 +229,46 @@ public class MarketDataAccessController
             logger.warn("Exception while retrieving quote from ETrade API for symbol {}", symbol, e);
         }
 
+    }
+    
+    
+    
+    @CrossOrigin(origins = "*")
+    @GetMapping("/optionChain")
+    public void getOptionChain(HttpServletResponse response, @RequestParam(name = "symbol", defaultValue = "qqq") String symbol )
+    {
+        
+        logger.info("Full Option Chain: {}  ", symbol);
+        try (PrintWriter writer = response.getWriter())
+        {
+            RestTemplate restTemplate = serviceRestTemplate();
+            if (restTemplate ==null)
+            {
+                logger.info("oAuth Token not ready");
+                writer.println("oAuth Token not ready");      
+                return;
+            }
+            
+            String url = getUrl("optionchains?symbol={symbol}");
+            
+            Map<String, String> params = new HashMap<>();
+            params.put("symbol", symbol);
+            
+            OptionChainResponseWrapper optionChainWrapper = restTemplate.getForObject(url,  OptionChainResponseWrapper.class, params);
+            OptionChainResponse optionChainResponse = optionChainWrapper.getResponse();
+            List<OptionPairEntry> optionPairs = optionChainResponse.getOptionPairs();
+            for (OptionPairEntry optionPair : optionPairs)
+            {
+                writer.println(optionPair.toString());
+            }
+            
+        }
+        catch (IOException e)
+        {
+            logger.warn("Exception while retrieving quote from ETrade API for symbol {}", symbol, e);
+        }
+
+        
     }
     
     public RestTemplate serviceRestTemplate() {
